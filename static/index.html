@@ -1,0 +1,748 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Speech Translator</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 850px;
+      margin: 35px auto;
+      padding: 20px;
+      background: #f4f6fb;
+      color: #172033;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #64748b;
+      margin-bottom: 28px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 14px;
+      padding: 22px;
+      margin-bottom: 18px;
+      box-shadow: 0 3px 12px #0000000a;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    label {
+      font-weight: 600;
+    }
+
+    select, button {
+      padding: 11px 14px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      font-size: 15px;
+    }
+
+    select {
+      background: white;
+      flex: 1;
+      min-width: 150px;
+    }
+
+    button {
+      cursor: pointer;
+      background: #2563eb;
+      color: white;
+      border: none;
+    }
+
+    button:hover:not(:disabled) {
+      background: #1d4ed8;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    #stop {
+      background: #dc2626;
+    }
+
+    #stop:hover:not(:disabled) {
+      background: #b91c1c;
+    }
+
+    #status {
+      margin: 18px 0 0;
+      color: #475569;
+      font-size: 14px;
+      overflow-wrap: anywhere;
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #94a3b8;
+      margin-right: 7px;
+    }
+
+    .status-dot.active {
+      background: #16a34a;
+    }
+
+    .panel-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    h2 {
+      font-size: 18px;
+      margin: 0 0 15px;
+    }
+
+    .result {
+      min-height: 65px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      line-height: 1.8;
+      font-size: 16px;
+    }
+
+    .muted {
+      color: #94a3b8;
+    }
+
+    .small-button {
+      background: #e8efff;
+      color: #1d4ed8;
+      padding: 8px 12px;
+      font-size: 13px;
+    }
+
+    .small-button:hover:not(:disabled) {
+      background: #dbe7ff;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .note {
+      font-size: 13px;
+      color: #64748b;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 560px) {
+      body {
+        margin: 10px auto;
+        padding: 12px;
+      }
+
+      .controls {
+        align-items: stretch;
+      }
+
+      .controls button {
+        flex: 1;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Live Speech Translator</h1>
+  <p class="subtitle">
+    Speak naturally and get translated text and spoken output.
+  </p>
+
+  <section class="card">
+    <div class="controls">
+      <label for="language">Translate into:</label>
+
+      <select id="language">
+        <option value="Hindi" data-voice="hi-IN">Hindi</option>
+        <option value="English" data-voice="en-US">English</option>
+        <option value="Marathi" data-voice="mr-IN">Marathi</option>
+        <option value="French" data-voice="fr-FR">French</option>
+        <option value="Spanish" data-voice="es-ES">Spanish</option>
+        <option value="German" data-voice="de-DE">German</option>
+        <option value="Japanese" data-voice="ja-JP">Japanese</option>
+        <option value="Italian" data-voice="it-IT">Italian</option>
+        <option value="Portuguese" data-voice="pt-PT">Portuguese</option>
+        <option value="Chinese" data-voice="zh-CN">Chinese</option>
+      </select>
+
+      <button id="start">Start microphone</button>
+      <button id="stop" disabled>Stop</button>
+    </div>
+
+    <p id="status">
+      <span id="statusDot" class="status-dot"></span>
+      Ready to start
+    </p>
+  </section>
+
+  <section class="card">
+    <div class="panel-heading">
+      <h2>Recognized speech</h2>
+      <button id="clearOriginal" class="small-button">
+        Clear
+      </button>
+    </div>
+
+    <div id="original" class="result muted">
+      Your recognized speech will appear here.
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="panel-heading">
+      <h2>Translation</h2>
+      <button id="clearTranslated" class="small-button">
+        Clear
+      </button>
+    </div>
+
+    <div id="translated" class="result muted">
+      Your translation will appear here.
+    </div>
+
+    <div class="actions">
+      <button id="speak">Speak translation</button>
+      <button id="stopSpeaking" class="small-button">
+        Stop speaking
+      </button>
+    </div>
+
+    <p class="note">
+      Speech uses voices available in your browser or operating system.
+      Some languages may require an additional voice to be installed.
+    </p>
+  </section>
+
+  <script>
+    const languageSelect = document.getElementById("language");
+    const startButton = document.getElementById("start");
+    const stopButton = document.getElementById("stop");
+    const speakButton = document.getElementById("speak");
+    const stopSpeakingButton = document.getElementById("stopSpeaking");
+
+    const statusText = document.getElementById("status");
+    const statusDot = document.getElementById("statusDot");
+    const originalElement = document.getElementById("original");
+    const translatedElement = document.getElementById("translated");
+
+    let socket = null;
+    let mediaStream = null;
+    let running = false;
+    let recorder = null;
+    let captureTask = null;
+    let sessionId = 0;
+
+    let speechQueue = [];
+    let speaking = false;
+    let lastSpokenText = "";
+
+    const originalLines = [];
+    const translatedLines = [];
+
+    const supportedMimeType = [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/ogg;codecs=opus"
+    ].find(type => MediaRecorder.isTypeSupported(type));
+
+    function setStatus(message, active = false) {
+      statusText.textContent = message;
+
+      const dot = document.createElement("span");
+      dot.className = "status-dot" + (active ? " active" : "");
+
+      statusText.prepend(dot);
+      statusDot.remove();
+      statusDot.id = "oldStatusDot";
+    }
+
+    // Rebuild the status indicator safely.
+    function updateStatus(message, active = false) {
+      statusText.replaceChildren();
+
+      const dot = document.createElement("span");
+      dot.className = "status-dot" + (active ? " active" : "");
+      statusText.append(dot, document.createTextNode(message));
+    }
+
+    function renderLines(element, lines, placeholder) {
+      element.textContent = lines.length
+        ? lines.join("\n")
+        : placeholder;
+
+      element.classList.toggle("muted", lines.length === 0);
+    }
+
+    function getTargetVoice() {
+      const selected = languageSelect.selectedOptions[0];
+      const languageCode = selected.dataset.voice.toLowerCase();
+      const voices = speechSynthesis.getVoices();
+
+      return (
+        voices.find(
+          voice => voice.lang.toLowerCase() === languageCode
+        ) ||
+        voices.find(
+          voice =>
+            voice.lang.split("-")[0].toLowerCase() ===
+            languageCode.split("-")[0]
+        ) ||
+        null
+      );
+    }
+
+    function stopSpeech() {
+      speechQueue = [];
+      speaking = false;
+      speechSynthesis.cancel();
+    }
+
+    function speakNext() {
+      if (speaking || speechQueue.length === 0) return;
+
+      if (!("speechSynthesis" in window)) {
+        updateStatus("Speech synthesis is not supported in this browser.");
+        return;
+      }
+
+      const item = speechQueue.shift();
+      const voice = getTargetVoice();
+
+      if (!voice) {
+        updateStatus(
+          `No voice is installed for ${item.language}. ` +
+          "Install a matching language voice or use another language."
+        );
+
+        speakNext();
+        return;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(item.text);
+      utterance.voice = voice;
+      utterance.lang = voice.lang;
+
+      // A slightly slower rate can help with translated speech.
+      utterance.rate = 0.95;
+
+      speaking = true;
+
+      utterance.onend = () => {
+        speaking = false;
+        speakNext();
+      };
+
+      utterance.onerror = event => {
+        speaking = false;
+
+        console.error("TTS error:", event.error);
+
+        if (event.error !== "canceled" && event.error !== "interrupted") {
+          updateStatus("Speech playback failed: " + event.error);
+        }
+
+        speakNext();
+      };
+
+      speechSynthesis.speak(utterance);
+    }
+
+    function queueSpeech(text, language) {
+      const cleanText = text.trim();
+
+      if (!cleanText || cleanText === lastSpokenText) return;
+
+      lastSpokenText = cleanText;
+
+      speechQueue.push({
+        text: cleanText,
+        language
+      });
+
+      speakNext();
+    }
+
+    function handleSocketMessage(event, currentSession) {
+      if (currentSession !== sessionId) return;
+
+      let data;
+
+      try {
+        data = JSON.parse(event.data);
+      } catch {
+        console.error("Invalid server message:", event.data);
+        return;
+      }
+
+      if (data.type === "status") {
+        updateStatus(data.message, running);
+        return;
+      }
+
+      if (data.type === "result") {
+        const original = (data.original || "").trim();
+        const translated = (data.translated || "").trim();
+
+        if (original) {
+          originalLines.push(original);
+          renderLines(
+            originalElement,
+            originalLines,
+            "Your recognized speech will appear here."
+          );
+        }
+
+        if (translated) {
+          translatedLines.push(translated);
+          renderLines(
+            translatedElement,
+            translatedLines,
+            "Your translation will appear here."
+          );
+
+          const selectedLanguage = languageSelect.value;
+          queueSpeech(translated, selectedLanguage);
+        }
+
+        updateStatus("Listening and translating...", running);
+        return;
+      }
+
+      if (data.type === "error") {
+        updateStatus(data.message || "Audio processing failed.");
+      }
+    }
+
+    function sendRecording(chunks, currentSession, currentSocket) {
+      if (
+        currentSession !== sessionId ||
+        !running ||
+        currentSocket !== socket ||
+        currentSocket.readyState !== WebSocket.OPEN ||
+        chunks.length === 0
+      ) {
+        return;
+      }
+
+      const blob = new Blob(chunks, {
+        type: supportedMimeType || "audio/webm"
+      });
+
+      if (blob.size > 0) {
+        currentSocket.send(blob);
+      }
+    }
+
+    async function captureChunks(currentSession, currentSocket) {
+      while (
+        running &&
+        currentSession === sessionId &&
+        currentSocket === socket &&
+        currentSocket.readyState === WebSocket.OPEN
+      ) {
+        const chunks = [];
+
+        try {
+          recorder = new MediaRecorder(
+            mediaStream,
+            supportedMimeType
+              ? { mimeType: supportedMimeType }
+              : undefined
+          );
+
+          const currentRecorder = recorder;
+
+          currentRecorder.ondataavailable = event => {
+            if (event.data && event.data.size > 0) {
+              chunks.push(event.data);
+            }
+          };
+
+          const stopped = new Promise(resolve => {
+            currentRecorder.onstop = resolve;
+          });
+
+          currentRecorder.start();
+
+          await new Promise(resolve => setTimeout(resolve, 3000));
+
+          if (
+            currentSession !== sessionId ||
+            !running
+          ) {
+            if (currentRecorder.state !== "inactive") {
+              currentRecorder.stop();
+            }
+
+            await stopped;
+            break;
+          }
+
+          if (currentRecorder.state !== "inactive") {
+            currentRecorder.stop();
+          }
+
+          await stopped;
+
+          sendRecording(chunks, currentSession, currentSocket);
+
+        } catch (error) {
+          console.error("Recording error:", error);
+
+          if (running && currentSession === sessionId) {
+            updateStatus("Recording error: " + error.message);
+          }
+
+          break;
+        }
+      }
+    }
+
+    async function startSession() {
+      if (running) return;
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        updateStatus("Microphone access requires localhost or HTTPS.");
+        return;
+      }
+
+      if (!window.MediaRecorder) {
+        updateStatus("Your browser does not support MediaRecorder.");
+        return;
+      }
+
+      if (!supportedMimeType) {
+        updateStatus("No supported WebM or Ogg audio format was found.");
+        return;
+      }
+
+      if (!("speechSynthesis" in window)) {
+        updateStatus("This browser does not support speech synthesis.");
+        return;
+      }
+
+      const currentSession = ++sessionId;
+
+      running = true;
+      startButton.disabled = true;
+      stopButton.disabled = false;
+
+      stopSpeech();
+      lastSpokenText = "";
+
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+
+        if (!running || currentSession !== sessionId) {
+          mediaStream.getTracks().forEach(track => track.stop());
+          return;
+        }
+
+        const protocol =
+          location.protocol === "https:" ? "wss:" : "ws:";
+
+        const currentSocket = new WebSocket(
+          `${protocol}//${location.host}/ws`
+        );
+
+        socket = currentSocket;
+
+        currentSocket.onopen = () => {
+          if (currentSession !== sessionId || !running) {
+            currentSocket.close();
+            return;
+          }
+
+          currentSocket.send(JSON.stringify({
+            language: languageSelect.value
+          }));
+
+          updateStatus("Listening and translating...", true);
+
+          captureTask = captureChunks(
+            currentSession,
+            currentSocket
+          );
+        };
+
+        currentSocket.onmessage = event => {
+          handleSocketMessage(event, currentSession);
+        };
+
+        currentSocket.onerror = () => {
+          if (currentSession === sessionId && running) {
+            updateStatus("WebSocket error. Check the backend terminal.");
+          }
+        };
+
+        currentSocket.onclose = () => {
+          if (currentSession === sessionId && running) {
+            updateStatus("Connection closed. Restart the microphone.");
+            stopSession(false);
+          }
+        };
+
+      } catch (error) {
+        console.error(error);
+        updateStatus("Could not start: " + error.message);
+        stopSession();
+      }
+    }
+
+    function stopSession(updateMessage = true) {
+      running = false;
+
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+        mediaStream = null;
+      }
+
+      if (recorder && recorder.state !== "inactive") {
+        recorder.stop();
+      }
+
+      recorder = null;
+
+      const oldSocket = socket;
+      socket = null;
+
+      if (
+        oldSocket &&
+        oldSocket.readyState !== WebSocket.CLOSED
+      ) {
+        oldSocket.close();
+      }
+
+      stopSpeech();
+
+      startButton.disabled = false;
+      stopButton.disabled = true;
+
+      if (updateMessage) {
+        updateStatus("Stopped");
+      }
+    }
+
+    startButton.addEventListener("click", startSession);
+
+    stopButton.addEventListener("click", () => {
+      // Invalidate pending recording and socket callbacks.
+      sessionId++;
+      stopSession();
+    });
+
+    speakButton.addEventListener("click", () => {
+      const text = translatedLines.join(" ").trim();
+
+      if (!text) {
+        updateStatus("No translated text is available to speak.");
+        return;
+      }
+
+      stopSpeech();
+      lastSpokenText = "";
+
+      queueSpeech(text, languageSelect.value);
+    });
+
+    stopSpeakingButton.addEventListener("click", stopSpeech);
+
+    document.getElementById("clearOriginal").addEventListener("click", () => {
+      originalLines.length = 0;
+      renderLines(
+        originalElement,
+        originalLines,
+        "Your recognized speech will appear here."
+      );
+    });
+
+    document.getElementById("clearTranslated").addEventListener("click", () => {
+      translatedLines.length = 0;
+      lastSpokenText = "";
+
+      renderLines(
+        translatedElement,
+        translatedLines,
+        "Your translation will appear here."
+      );
+
+      stopSpeech();
+    });
+
+    languageSelect.addEventListener("change", () => {
+      if (running) {
+        sessionId++;
+        stopSession(false);
+        updateStatus("Language changed. Start the microphone again.");
+      }
+
+      stopSpeech();
+      lastSpokenText = "";
+    });
+
+    // Some browsers populate voices asynchronously.
+    speechSynthesis.onvoiceschanged = () => {
+      console.log(
+        "Available speech voices:",
+        speechSynthesis.getVoices().map(voice => ({
+          name: voice.name,
+          language: voice.lang
+        }))
+      );
+    };
+
+    // Initialize available voices.
+    speechSynthesis.getVoices();
+
+    window.addEventListener("beforeunload", () => {
+      running = false;
+
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+      }
+
+      speechSynthesis.cancel();
+
+      if (socket) {
+        socket.close();
+      }
+    });
+  </script>
+</body>
+</html>
